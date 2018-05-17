@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/creack/termios/win"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -128,27 +127,23 @@ func handleChannel(newChannel ssh.NewChannel) {
 		once.Do(close)
 	}()
 
+	var wantsPTY bool = false
 	go func() {
 		for req := range requests {
 			fmt.Println("Req:", req.Type)
 			switch req.Type {
 			case "shell":
-				// We only accept the default shell
-				// (i.e. no command in the Payload)
-				if len(req.Payload) == 0 {
-					req.Reply(true, nil)
-				}
+
 			case "pty-req":
-				termLen := req.Payload[3]
-				w, h := parseDims(req.Payload[termLen+4:])
-				ws := &win.Winsize{Width: uint16(w), Height: uint16(h)}
-				win.SetWinsize(cmdf.Fd(), ws)
+				wantsPTY = true
 				req.Reply(true, nil)
 			case "window-change":
 				w, h := parseDims(req.Payload)
-				ws := &win.Winsize{Width: uint16(w), Height: uint16(h)}
-				win.SetWinsize(cmdf.Fd(), ws)
+				ws := &Winsize{Width: uint16(w), Height: uint16(h)}
+				SetWinsize(cmdf.Fd(), ws)
 				req.Reply(true, nil)
+			case "env":
+
 			default:
 				log.Println("cannot handle request:", req.Type)
 				req.Reply(false, nil)
